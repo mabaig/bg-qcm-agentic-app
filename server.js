@@ -1,7 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const { runAgent } = require('./agent/agent');
 
 const app = express();
@@ -55,7 +55,7 @@ app.post('/api/chat', async (req, res) => {
     return res.status(500).json({ error: 'ANTHROPIC_API_KEY is not configured' });
   }
 
-  const sessionId = existingId || uuidv4();
+  const sessionId = existingId || randomUUID();
 
   if (!sessions.has(sessionId)) {
     sessions.set(sessionId, { messages: [], status: 'idle', pendingConfirmation: null });

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QCM Agent — Quality Case Management</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- ── Header ────────────────────────────────────────────── -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo">
+          <span class="logo-icon">⬡</span>
+          <span class="logo-text">QCM<span class="logo-accent"> Agent</span></span>
+        </div>
+        <span class="header-subtitle">Quality Case Management · Agentic Operations</span>
+      </div>
+      <div class="header-right">
+        <span id="agent-status-badge" class="status-badge idle">Idle</span>
+        <button id="btn-new-session" class="btn btn-ghost" title="New conversation">↺ New</button>
+      </div>
+    </header>
+
+    <!-- ── Main layout ───────────────────────────────────────── -->
+    <main class="app-body">
+
+      <!-- LEFT — Chat (30%) -->
+      <section class="panel-chat">
+        <div class="panel-header">
+          <span class="panel-title">Chat</span>
+          <span class="panel-hint">Natural language commands</span>
+        </div>
+
+        <div id="chat-messages" class="chat-messages">
+          <div class="chat-welcome">
+            <div class="welcome-icon">⬡</div>
+            <p class="welcome-title">QCM Agent ready</p>
+            <p class="welcome-hint">Describe what you need in plain language.</p>
+            <div class="example-prompts">
+              <button class="example-btn" data-prompt="Show me all open quality cases">Show open cases</button>
+              <button class="example-btn" data-prompt="Get available case types">List case types</button>
+              <button class="example-btn" data-prompt="Show me all active inventory locks">Active locks</button>
+              <button class="example-btn" data-prompt="Create a quality case for damaged item LPN-001 at facility MAIN">Create case</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-input-area">
+          <textarea
+            id="chat-input"
+            class="chat-input"
+            placeholder="e.g. Create quality cases for all damaged LPNs and lock them..."
+            rows="3"
+          ></textarea>
+          <div class="chat-input-footer">
+            <span class="input-hint">Shift+Enter for new line · Enter to send</span>
+            <button id="btn-send" class="btn btn-primary">Send →</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RIGHT — Agent Workspace (70%) -->
+      <section class="panel-workspace">
+
+        <!-- ① Plan -->
+        <div class="workspace-section" id="section-plan">
+          <div class="section-header">
+            <span class="section-icon">🧠</span>
+            <span class="section-title">Plan</span>
+            <span class="section-badge" id="plan-step-count"></span>
+          </div>
+          <div id="plan-content" class="plan-content">
+            <div class="empty-state">Plan will appear here after you send a command.</div>
+          </div>
+          <div id="plan-impact" class="plan-impact hidden"></div>
+        </div>
+
+        <!-- ② Actions (confirmation) -->
+        <div id="section-actions" class="workspace-section actions-section hidden">
+          <div class="section-header">
+            <span class="section-icon">✅</span>
+            <span class="section-title">Actions Required</span>
+          </div>
+          <div id="actions-content" class="actions-content">
+            <div id="confirm-message" class="confirm-message"></div>
+            <div class="action-buttons">
+              <button id="btn-confirm" class="btn btn-danger">Confirm & Execute</button>
+              <button id="btn-cancel" class="btn btn-ghost">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ③ Execution Logs -->
+        <div class="workspace-section" id="section-logs">
+          <div class="section-header">
+            <span class="section-icon">⚙️</span>
+            <span class="section-title">Execution Logs</span>
+            <span class="section-badge" id="log-count"></span>
+          </div>
+          <div id="logs-content" class="logs-content">
+            <div class="empty-state">Execution steps will appear here during agent run.</div>
+          </div>
+        </div>
+
+        <!-- ④ Results -->
+        <div class="workspace-section" id="section-results">
+          <div class="section-header">
+            <span class="section-icon">📊</span>
+            <span class="section-title">Results</span>
+          </div>
+          <div id="results-content" class="results-content">
+            <div class="empty-state">Results will appear here after execution.</div>
+          </div>
+        </div>
+
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

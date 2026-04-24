@@ -100,9 +100,13 @@ app.get('/api/session/:sessionId', (req, res) => {
 // ── Health check ──────────────────────────────────────────────────────────
 app.get('/api/health', (_, res) => res.json({ ok: true }));
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`\n🚀  QCM Agentic App  →  http://localhost:${PORT}\n`);
-});
+// On Vercel the runtime calls the exported handler directly — no listen() needed.
+// Locally (npm run dev) we start the server normally.
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`\n🚀  QCM Agentic App  →  http://localhost:${PORT}\n`);
+  });
+}
 
 module.exports = app;

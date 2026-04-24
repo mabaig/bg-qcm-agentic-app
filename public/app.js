@@ -1,3 +1,19 @@
+/* ─── Markdown renderer ────────────────────────────────────────────────────── */
+// Configured once on load; marked is loaded via CDN before this script
+function initMarked() {
+  if (typeof marked === 'undefined') return;
+  marked.setOptions({
+    gfm:    true,   // GitHub-flavoured markdown — enables pipe tables
+    breaks: true,   // newline → <br>
+  });
+}
+document.addEventListener('DOMContentLoaded', initMarked);
+
+function md(text) {
+  if (typeof marked === 'undefined') return esc(text);
+  return marked.parse(String(text ?? ''));
+}
+
 /* ─── State ────────────────────────────────────────────────────────────────── */
 let sessionId   = null;
 let eventSource = null;
@@ -326,7 +342,7 @@ function renderResults(data) {
 
   let summaryHtml = '';
   if (data.summary) {
-    summaryHtml = `<div class="result-summary">${esc(data.summary)}</div>`;
+    summaryHtml = `<div class="result-summary md-body">${md(data.summary)}</div>`;
   }
 
   let tablesHtml = '';
@@ -382,18 +398,20 @@ function buildTable(toolName, items) {
 
 /* ─── Chat helpers ──────────────────────────────────────────────────────────── */
 function addChatMessage(role, text) {
-  const isSystem = role === 'system';
-  const initials = role === 'user' ? 'ME' : 'AI';
-
   const el = document.createElement('div');
   el.className = `chat-msg ${role}`;
 
-  if (isSystem) {
+  if (role === 'system') {
     el.innerHTML = `<div class="chat-bubble">${esc(text)}</div>`;
-  } else {
+  } else if (role === 'user') {
     el.innerHTML = `
-      <div class="chat-avatar">${initials}</div>
+      <div class="chat-avatar">ME</div>
       <div class="chat-bubble">${esc(text)}</div>`;
+  } else {
+    // assistant — render full markdown (tables, bold, lists, code)
+    el.innerHTML = `
+      <div class="chat-avatar">AI</div>
+      <div class="chat-bubble md-body">${md(text)}</div>`;
   }
 
   chatMessages.appendChild(el);

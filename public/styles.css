@@ -217,6 +217,8 @@ body {
   max-width: 82%; padding: 8px 12px;
   border-radius: var(--radius); font-size: 13px; line-height: 1.55;
 }
+/* Allow assistant bubbles with tables to use more width */
+.chat-msg.assistant .chat-bubble { max-width: 96%; }
 .chat-msg.user      .chat-bubble { background: var(--orange-15); color: var(--text); border: 1px solid var(--orange-30); }
 .chat-msg.assistant .chat-bubble { background: var(--bg-card);   color: var(--text); border: 1px solid var(--border); }
 .chat-msg.system    .chat-bubble { color: var(--text-dim); font-size: 11px; font-style: italic; }
@@ -455,6 +457,94 @@ body {
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:nth-child(even) td { background: var(--bg-card); }
 .data-table tr:hover td { background: var(--bg-hover); }
+
+/* ─── Markdown body (.md-body) ───────────────────────────────────────────── */
+/* Applied to assistant chat bubbles and the result-summary block            */
+
+.md-body { line-height: 1.65; }
+
+/* Paragraphs */
+.md-body p { margin: 0 0 8px; }
+.md-body p:last-child { margin-bottom: 0; }
+
+/* Headings */
+.md-body h1, .md-body h2, .md-body h3 {
+  font-weight: 700; margin: 10px 0 6px; color: var(--text); line-height: 1.3;
+}
+.md-body h1 { font-size: 15px; }
+.md-body h2 { font-size: 14px; }
+.md-body h3 { font-size: 13px; color: var(--cyan); }
+
+/* Lists */
+.md-body ul, .md-body ol {
+  padding-left: 18px; margin: 4px 0 8px;
+}
+.md-body li { margin-bottom: 3px; }
+.md-body li:last-child { margin-bottom: 0; }
+
+/* Inline code */
+.md-body code {
+  font-family: var(--font-mono); font-size: 11px;
+  background: var(--bg-hover); color: var(--cyan);
+  padding: 1px 5px; border-radius: var(--radius-xs);
+  border: 1px solid var(--border);
+}
+
+/* Code blocks */
+.md-body pre {
+  background: var(--bg-root); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 10px 12px;
+  overflow-x: auto; margin: 6px 0;
+}
+.md-body pre code {
+  background: none; border: none; padding: 0;
+  color: var(--text-muted); font-size: 11px;
+}
+
+/* Bold / italic */
+.md-body strong { font-weight: 700; color: var(--orange); }
+.md-body em     { font-style: italic; color: var(--text-muted); }
+
+/* Blockquote */
+.md-body blockquote {
+  border-left: 3px solid var(--orange);
+  padding: 4px 10px; margin: 6px 0;
+  background: var(--orange-15); border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  color: var(--text-muted);
+}
+
+/* Horizontal rule */
+.md-body hr { border: none; border-top: 1px solid var(--border); margin: 10px 0; }
+
+/* ── Markdown tables ── */
+.md-body table {
+  width: 100%; border-collapse: collapse;
+  margin: 8px 0; font-size: 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.md-body thead { background: var(--bg-card); }
+.md-body th {
+  padding: 7px 11px; text-align: left;
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px;
+  color: var(--cyan);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.md-body td {
+  padding: 7px 11px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text); font-family: var(--font-mono); font-size: 11px;
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.md-body tr:last-child td  { border-bottom: none; }
+.md-body tr:nth-child(even) td { background: var(--bg-raised); }
+.md-body tr:hover td { background: var(--bg-hover); }
+
+/* Inside chat bubbles the table should not overflow the bubble width */
+.chat-bubble.md-body table,
+.chat-bubble .md-body table { width: 100%; max-width: 100%; }
 
 /* ─── Scrollbars ──────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }

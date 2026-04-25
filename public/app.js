@@ -599,6 +599,17 @@ function updateStatsDisplay() {
   existing.querySelector('.stat-failed .stat-value').textContent  = stats.failed;
 }
 
+/* Columns that reference entity identifiers — rendered cyan */
+const CYAN_COLS  = new Set(['case_number','target_value','affected_lot_lpn','item_number','case_lock_id','lpn','lpn_number']);
+/* Status values that signal a warning/damage state — rendered amber */
+const WARN_RE    = /^(LOCK|LOCKED|DAMAGE|DAMAGED|WARNING|HOLD|BLOCKED)/i;
+
+function cellClass(colKey, value) {
+  if (CYAN_COLS.has(colKey)) return ' class="cell-cyan"';
+  if (colKey === 'status' && WARN_RE.test(value)) return ' class="cell-amber"';
+  return '';
+}
+
 function buildTable(toolName, items) {
   if (!items?.length) return '';
 
@@ -610,11 +621,14 @@ function buildTable(toolName, items) {
   const sorted = [
     ...PRIORITY.filter(k => keys.includes(k)),
     ...keys.filter(k => !PRIORITY.includes(k)),
-  ].slice(0, 10); // cap columns
+  ].slice(0, 10);
 
   const thead = sorted.map(k => `<th>${esc(k.replace(/_/g,' '))}</th>`).join('');
   const tbody = items.slice(0, 50).map(row =>
-    `<tr>${sorted.map(k => `<td title="${esc(String(row[k] ?? ''))}">${esc(String(row[k] ?? ''))}</td>`).join('')}</tr>`
+    `<tr>${sorted.map(k => {
+      const v = String(row[k] ?? '');
+      return `<td${cellClass(k, v)} title="${esc(v)}">${esc(v)}</td>`;
+    }).join('')}</tr>`
   ).join('');
 
   return `

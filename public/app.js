@@ -89,6 +89,10 @@ document.addEventListener('DOMContentLoaded', () => {
   btnCancel.addEventListener('click',  () => sendConfirmation(false));
   btnBell.addEventListener('click', onBellClick);
   btnTheme.addEventListener('click', toggleTheme);
+  $('btn-signout').addEventListener('click', () => {
+    sessionStorage.removeItem('qcm_auth');
+    window.location.replace('/login');
+  });
   btnModalConfirm.addEventListener('click', () => submitReview(true));
   btnModalCancel.addEventListener('click',  () => submitReview(false));
 

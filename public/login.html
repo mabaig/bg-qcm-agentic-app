@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QCM Agentic App — Sign In</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="stylesheet" href="styles.css" />
+  <style>
+    html, body {
+      height: 100%; overflow: auto;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .login-wrap { width: 100%; max-width: 400px; padding: 24px; }
+
+    .login-card {
+      background: var(--bg-raised);
+      border: 1px solid var(--border-mid);
+      border-radius: 12px;
+      padding: 40px 36px;
+      box-shadow: 0 20px 56px rgba(0,0,0,0.45);
+    }
+
+    .login-header { text-align: center; margin-bottom: 32px; }
+
+    .login-logo-icon {
+      width: 56px; height: 56px;
+      background: var(--orange);
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px; font-weight: 900; color: #fff;
+      margin: 0 auto 16px;
+    }
+
+    .login-brand {
+      font-size: 21px; font-weight: 800; color: var(--text);
+      letter-spacing: -0.2px; margin-bottom: 5px;
+    }
+    .login-brand span { color: var(--orange); }
+
+    .login-sub {
+      font-size: 12px; color: var(--text-muted);
+    }
+
+    .field-group { margin-bottom: 16px; }
+
+    .field-label {
+      display: block; font-size: 11px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px;
+      color: var(--text-muted); margin-bottom: 6px;
+    }
+
+    .field-input {
+      width: 100%;
+      background: var(--bg-input);
+      border: 1px solid var(--border-mid);
+      border-radius: var(--radius-sm);
+      color: var(--text); padding: 10px 13px;
+      font-size: 13.5px; font-family: var(--font-ui);
+      outline: none;
+      transition: border-color var(--ease), box-shadow var(--ease);
+    }
+    .field-input:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 3px var(--cyan-15);
+    }
+    .field-input::placeholder { color: var(--text-dim); }
+
+    .login-error {
+      margin-bottom: 16px; padding: 10px 13px;
+      background: var(--red-10);
+      border: 1px solid rgba(231,76,60,0.3);
+      border-left: 3px solid var(--red);
+      border-radius: var(--radius-sm);
+      font-size: 12.5px; color: var(--red);
+    }
+
+    .btn-login {
+      width: 100%; padding: 11px;
+      font-size: 14px; font-weight: 700;
+      justify-content: center; letter-spacing: 0.2px;
+      margin-top: 4px;
+    }
+
+    .login-footer {
+      text-align: center; margin-top: 22px;
+      font-size: 11px; color: var(--text-dim);
+    }
+  </style>
+  <script>
+    (function () {
+      document.documentElement.dataset.theme = localStorage.getItem('theme') || 'dark';
+      if (sessionStorage.getItem('qcm_auth')) window.location.replace('/');
+    })();
+  </script>
+</head>
+<body>
+  <div class="login-wrap">
+    <div class="login-card">
+
+      <div class="login-header">
+        <div class="login-logo-icon">⬡</div>
+        <div class="login-brand">QCM <span>Agentic App</span></div>
+        <p class="login-sub">Quality Case Management · Agentic Operations</p>
+      </div>
+
+      <form id="login-form" autocomplete="on">
+        <div class="field-group">
+          <label class="field-label" for="inp-user">Username</label>
+          <input class="field-input" type="text" id="inp-user"
+                 name="username" placeholder="Enter username"
+                 autocomplete="username" />
+        </div>
+        <div class="field-group">
+          <label class="field-label" for="inp-pass">Password</label>
+          <input class="field-input" type="password" id="inp-pass"
+                 name="password" placeholder="Enter password"
+                 autocomplete="current-password" />
+        </div>
+
+        <div id="login-error" class="login-error hidden"></div>
+
+        <button type="submit" id="btn-login" class="btn btn-primary btn-login">
+          Sign In →
+        </button>
+      </form>
+
+      <p class="login-footer">Internal use only · Intellinum SCM</p>
+    </div>
+  </div>
+
+  <script>
+    const form     = document.getElementById('login-form');
+    const errEl    = document.getElementById('login-error');
+    const btnLogin = document.getElementById('btn-login');
+
+    document.getElementById('inp-user').focus();
+
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const username = document.getElementById('inp-user').value.trim();
+      const password = document.getElementById('inp-pass').value;
+
+      if (!username || !password) {
+        showError('Please enter both username and password.');
+        return;
+      }
+
+      btnLogin.disabled    = true;
+      btnLogin.textContent = 'Signing in…';
+      errEl.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/login', {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ username, password }),
+        });
+
+        if (res.ok) {
+          sessionStorage.setItem('qcm_auth', '1');
+          window.location.replace('/');
+        } else {
+          const data = await res.json().catch(() => ({}));
+          showError(data.error || 'Invalid username or password.');
+          resetBtn();
+        }
+      } catch {
+        showError('Network error — please try again.');
+        resetBtn();
+      }
+    });
+
+    function showError(msg) {
+      errEl.textContent = msg;
+      errEl.classList.remove('hidden');
+    }
+
+    function resetBtn() {
+      btnLogin.disabled    = false;
+      btnLogin.textContent = 'Sign In →';
+    }
+  </script>
+</body>
+</html>

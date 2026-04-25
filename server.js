@@ -20,6 +20,22 @@ function sendSSE(sessionId, event, data) {
   }
 }
 
+// ── Login ─────────────────────────────────────────────────────────────────
+app.post('/api/login', (req, res) => {
+  const { username, password } = req.body;
+  const validUser = process.env.APP_USERNAME || 'intellinum.scm';
+  const validPass = process.env.APP_PASSWORD || 'Welcome10';
+  if (username === validUser && password === validPass) {
+    res.json({ ok: true });
+  } else {
+    res.status(401).json({ error: 'Invalid username or password.' });
+  }
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login.html'));
+});
+
 // ── SSE stream subscription ───────────────────────────────────────────────
 app.get('/api/stream/:sessionId', (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');

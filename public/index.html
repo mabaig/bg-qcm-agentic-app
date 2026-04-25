@@ -6,6 +6,7 @@
   <title>QCM Agentic App — Quality Case Management</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg" />
   <link rel="stylesheet" href="styles.css" />
+  <script>if (!sessionStorage.getItem('qcm_auth')) window.location.replace('/login');</script>
 </head>
 <body>
   <div class="app">
@@ -30,6 +31,7 @@
         </button>
         <span id="agent-status-badge" class="status-badge idle">Idle</span>
         <button id="btn-new-session" class="btn btn-outline" title="New conversation">↺ New</button>
+        <button id="btn-signout" class="btn btn-ghost" title="Sign out">Sign out</button>
       </div>
     </header>
 

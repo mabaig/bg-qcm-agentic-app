@@ -80,6 +80,7 @@ const SVG_CHEVRON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="
 document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   setupCollapsibleSections();
+  setupResizeHandle();
 
   chatInput.addEventListener('keydown', onInputKeydown);
   btnSend.addEventListener('click', sendMessage);
@@ -138,6 +139,44 @@ function setupCollapsibleSections() {
       btn.setAttribute('aria-label',
         section.classList.contains('collapsed') ? 'Expand section' : 'Collapse section');
     });
+  });
+}
+
+/* ─── Resizable columns ──────────────────────────────────────────────────── */
+function setupResizeHandle() {
+  const handle   = $('resize-handle');
+  const panelChat = document.querySelector('.panel-chat');
+  const appBody   = document.querySelector('.app-body');
+  if (!handle || !panelChat || !appBody) return;
+
+  let dragging = false;
+  let startX, startWidth;
+
+  handle.addEventListener('mousedown', e => {
+    dragging  = true;
+    startX    = e.clientX;
+    startWidth = panelChat.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor     = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', e => {
+    if (!dragging) return;
+    const delta    = e.clientX - startX;
+    const total    = appBody.offsetWidth;
+    const newWidth = Math.min(Math.max(startWidth + delta, 180), total - 360);
+    panelChat.style.width    = newWidth + 'px';
+    panelChat.style.minWidth = 'unset';
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (!dragging) return;
+    dragging = false;
+    handle.classList.remove('dragging');
+    document.body.style.cursor     = '';
+    document.body.style.userSelect = '';
   });
 }
 

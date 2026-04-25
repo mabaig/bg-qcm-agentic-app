@@ -90,7 +90,7 @@ const toolExecutors = {
       caseResolution:    input.caseResolution    || '',
       closeComments:     input.closeComments     || '',
       userName:          process.env.QCM_USERNAME,
-      loginId:           process.env.QCM_LOGIN_ID,
+      loginId:           null,
     });
   },
 
@@ -132,7 +132,7 @@ const toolExecutors = {
       lockComments: input.lockComments || '',
       status:       'Completed',
       userName:     process.env.QCM_USERNAME,
-      loginId:      process.env.QCM_LOGIN_ID,
+      loginId:      null,
     }, { keepEmpty: true });
   },
 

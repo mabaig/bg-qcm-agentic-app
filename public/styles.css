@@ -251,11 +251,11 @@ body {
 }
 
 /* ─── Main body ──────────────────────────────────────────────────────────── */
-.app-body { display: flex; flex: 1; overflow: hidden; }
+.app-body { display: flex; flex: 1; min-height: 0; overflow: hidden; }
 
 /* ─── Chat panel — 30% ───────────────────────────────────────────────────── */
 .panel-chat {
-  width: 30%; min-width: 280px;
+  width: 30%; min-width: 280px; min-height: 0;
   display: flex; flex-direction: column;
   background: var(--bg-base);
   border-right: 1px solid var(--border);
@@ -352,6 +352,22 @@ body {
   justify-content: space-between; margin-top: 8px;
 }
 .input-hint { color: var(--text-dim); font-size: 11px; }
+
+/* ─── Column resize handle ───────────────────────────────────────────────── */
+.resize-handle {
+  width: 4px; flex-shrink: 0;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background var(--ease);
+  position: relative;
+}
+.resize-handle::after {
+  content: '';
+  position: absolute;
+  inset: 0 -5px;
+}
+.resize-handle:hover,
+.resize-handle.dragging { background: var(--orange); }
 
 /* ─── Workspace panel — 70% ───────────────────────────────────────────────── */
 .panel-workspace {

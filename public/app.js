@@ -267,6 +267,7 @@ function connectSSE(sid) {
   eventSource.addEventListener('step_error',            e => onStepError(JSON.parse(e.data)));
   eventSource.addEventListener('complete',              e => onComplete(JSON.parse(e.data)));
   eventSource.addEventListener('cancelled',             e => onCancelled(JSON.parse(e.data)));
+  eventSource.addEventListener('off_topic',             e => onOffTopic(JSON.parse(e.data)));
   eventSource.addEventListener('error',                 e => {
     if (e.data) onAgentError(JSON.parse(e.data));
   });
@@ -353,6 +354,13 @@ function onCancelled(data) {
   btnSend.disabled = false;
   sectionActions.classList.add('hidden');
   addChatMessage('system', `✕ ${data.message}`);
+  eventSource?.close();
+}
+
+function onOffTopic(data) {
+  setStatus('idle');
+  btnSend.disabled = false;
+  addChatMessage('assistant', data.message || 'I can only help with QCM and Oracle WMS Cloud operations.');
   eventSource?.close();
 }
 

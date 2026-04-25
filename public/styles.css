@@ -436,9 +436,9 @@ body {
   transition: border-color var(--ease), background var(--ease);
   animation: fadeIn 200ms ease;
 }
-.plan-step.running { border-color: var(--cyan);  background: var(--cyan-15); }
-.plan-step.success { border-color: var(--green); background: var(--green-10); }
-.plan-step.failed  { border-color: var(--red);   background: var(--red-10); }
+.plan-step.running { border-color: var(--cyan-30);           background: var(--cyan-15); }
+.plan-step.success { border-color: rgba(39, 174, 96, 0.28);  background: var(--green-10); }
+.plan-step.failed  { border-color: rgba(231, 76, 60, 0.28);  background: var(--red-10); }
 
 .step-num {
   width: 22px; height: 22px; border-radius: 50%;
@@ -792,4 +792,81 @@ select.review-input { cursor: pointer; appearance: auto; }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ─── Responsive — tablet (≤ 1024px) ────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .header-subtitle { display: none; }
+  .app-header { padding: 0 16px; }
+  .panel-workspace { padding: 10px; gap: 8px; }
+}
+
+/* ─── Responsive — mobile (≤ 768px) ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Header */
+  .app-header { height: 52px; padding: 0 12px; }
+  .header-left { gap: 10px; }
+  .header-right { gap: 6px; }
+  .logo-icon { width: 28px; height: 28px; font-size: 14px; border-radius: 6px; }
+  .logo-text { font-size: 16px; }
+  .status-badge { min-width: 70px; font-size: 10px; padding: 4px 10px; }
+  .btn-outline, #btn-signout { padding: 5px 10px; font-size: 12px; }
+
+  /* Stack panels vertically */
+  .app-body { flex-direction: column; }
+
+  /* Chat: compact strip at top */
+  .panel-chat {
+    width: 100% !important;
+    min-width: unset !important;
+    min-height: unset;
+    height: 220px;
+    flex-shrink: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+  }
+  .chat-messages { gap: 7px; padding: 10px; }
+  .chat-input-area { padding: 8px 10px; }
+  .chat-input { font-size: 16px; rows: 2; } /* 16px prevents iOS zoom */
+  .input-hint { display: none; }
+
+  /* Hide resize handle */
+  .resize-handle { display: none; }
+
+  /* Workspace: fills remaining height */
+  .panel-workspace { width: 100%; padding: 8px; gap: 7px; }
+
+  /* Compact workspace sections */
+  .section-header { padding: 8px 12px; }
+  .plan-content, .logs-content { padding: 8px 10px; }
+  .results-content { padding: 8px 10px; }
+
+  /* Stats cards: equal-width 3-up */
+  .stat-card { padding: 10px 8px; min-width: 70px; }
+  .stat-value { font-size: 20px; }
+  .stat-label { font-size: 9px; }
+
+  /* Data table: allow horizontal scroll but fit screen */
+  .data-table-wrapper { font-size: 11px; }
+
+  /* Modal: full-width on mobile */
+  .modal-box { max-width: 100%; border-radius: 8px; }
+  .modal-header { padding: 14px 16px 10px; }
+  .modal-body { padding: 10px 16px 12px; }
+  .modal-footer { padding: 10px 16px 14px; }
+
+  /* Review inputs: prevent iOS zoom */
+  .review-input, .chat-input { font-size: 16px !important; }
+}
+
+/* ─── Responsive — small phone (≤ 480px) ────────────────────────────────── */
+@media (max-width: 480px) {
+  .logo-text { font-size: 14px; }
+  .header-right { gap: 4px; }
+  .theme-btn, .bell-btn { width: 26px; height: 26px; }
+  #btn-signout { display: none; }  /* too cramped — sign-out via session expiry */
+  .panel-chat { height: 200px; }
+  .chat-bubble { font-size: 12px; padding: 6px 10px; }
+  .plan-step { padding: 7px 9px; gap: 8px; }
+  .step-desc { font-size: 11px; }
 }

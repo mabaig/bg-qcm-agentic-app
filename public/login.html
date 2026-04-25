@@ -87,6 +87,24 @@
       text-align: center; margin-top: 22px;
       font-size: 11px; color: var(--text-dim);
     }
+
+    /* ── Mobile ── */
+    @media (max-width: 600px) {
+      html, body { align-items: flex-start; padding-top: 40px; }
+      .login-wrap { padding: 16px; }
+      .login-card { padding: 28px 20px; border-radius: 10px; }
+      .login-logo-icon { width: 46px; height: 46px; font-size: 22px; }
+      .login-brand { font-size: 18px; }
+      /* 16px prevents iOS Safari from auto-zooming on focus */
+      .field-input { font-size: 16px; padding: 12px 13px; }
+      .btn-login { padding: 13px; font-size: 15px; }
+    }
+
+    @media (max-width: 380px) {
+      html, body { padding-top: 20px; }
+      .login-wrap { padding: 12px; }
+      .login-card { padding: 24px 16px; }
+    }
   </style>
   <script>
     (function () {

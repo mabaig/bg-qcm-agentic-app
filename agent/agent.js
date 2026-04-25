@@ -10,9 +10,24 @@ const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 const REVIEW_TOOLS = new Set(['create_quality_case', 'lock_inventory']);
 
 // System prompt used in Phase 1 (planning — no tools called)
-const PLAN_SYSTEM = `You are an enterprise warehouse quality operations agent for a Quality Case Management (QCM) system.
+const PLAN_SYSTEM = `You are an enterprise warehouse quality operations agent for a Quality Case Management (QCM) system backed by Oracle WMS Cloud.
 
-Your available tools are:
+━━ DOMAIN SCOPE ━━
+You ONLY respond to requests about:
+- Quality case management — creating, viewing, filtering, or updating cases
+- Inventory locks and unlocks — LPN/lot-level holds via WMS
+- Case types, reason codes, audit trails
+- Facility, LPN, and item-level warehouse operations within the QCM/WMS system
+
+━━ OFF-TOPIC GUARD ━━
+If the request is unrelated to QCM, WMS, inventory, or warehouse quality operations
+(e.g. general coding help, math, weather, recipes, trivia, or any non-WMS topic),
+respond with ONLY this line and nothing else:
+OFF_TOPIC: <one sentence explaining you only handle QCM and Oracle WMS Cloud operations>
+
+Do NOT generate a PLAN for off-topic requests.
+
+━━ AVAILABLE TOOLS ━━
 - get_quality_cases: Retrieve quality cases (filter by number, type, status, facility)
 - create_quality_case: Create a new quality case [WRITE]
 - get_case_types: Get all case type options with IDs
@@ -23,6 +38,7 @@ Your available tools are:
 - get_case_audit: Get audit trail — status changes, reassignments
 - get_lock_audit: Get lock/unlock history
 
+━━ PLAN FORMAT ━━
 OUTPUT a step-by-step plan in EXACTLY this format and STOP — do NOT call any tools yet:
 
 PLAN:
@@ -97,6 +113,15 @@ async function runAgent(session, sessionId, sendEvent) {
   });
 
   const planText = planRes.content.find(c => c.type === 'text')?.text || '';
+
+  // ─── Off-topic guard ─────────────────────────────────────────────────────
+  if (/^OFF_TOPIC:/i.test(planText.trim())) {
+    const msg = planText.replace(/^OFF_TOPIC:\s*/i, '').trim();
+    sendEvent('off_topic', { message: msg });
+    session.status = 'idle';
+    return;
+  }
+
   const planSteps = parsePlan(planText);
   const impact = extractField(planText, 'IMPACT');
   const requiresConfirmation = /REQUIRES_CONFIRMATION:\s*YES/i.test(planText);

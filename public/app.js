@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', initMarked);
 
 function md(text) {
   if (typeof marked === 'undefined') return esc(text);
-  return marked.parse(String(text ?? ''));
+  const html = marked.parse(String(text ?? ''));
+  return html.replace(/<a href=/g, '<a target="_blank" rel="noopener noreferrer" href=');
 }
 
 /* ─── State ────────────────────────────────────────────────────────────────── */
@@ -21,6 +22,10 @@ let planSteps   = [];
 let logCount    = 0;
 let stats       = { total: 0, success: 0, failed: 0 };
 let tableData   = {};   // toolName → result array, for result tables
+let pendingASNPayload = null;
+let parsedASNData     = null;  // { parsed, poData, asnPayload } — set after upload, cleared on new session
+
+const ASN_INTENT_RE = /\b(create|submit|send|make|build|generate)?\s*(asn|advanced.?ship|packing.?slip|receipt.?request)\b/i;
 
 /* ─── Review-modal field configs ────────────────────────────────────────────── */
 const REVIEW_FIELDS = {
@@ -71,6 +76,14 @@ const logCountBadge   = $('log-count');
 const resultsContent  = $('results-content');
 const panelDot        = document.querySelector('.panel-dot');
 
+/* ─── ASN DOM refs ───────────────────────────────────────────────────────── */
+const sectionDoc       = $('section-doc');
+const sectionPO        = $('section-po');
+const sectionASN       = $('section-asn-review');
+const docContent       = $('doc-content');
+const poContent        = $('po-content');
+const asnReviewContent = $('asn-review-content');
+
 /* ─── SVG icon helpers ───────────────────────────────────────────────────── */
 const SVG_SUN  = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`;
 const SVG_MOON = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
@@ -96,12 +109,19 @@ document.addEventListener('DOMContentLoaded', () => {
   btnModalConfirm.addEventListener('click', () => submitReview(true));
   btnModalCancel.addEventListener('click',  () => submitReview(false));
 
+  $('btn-asn-edit-send')?.addEventListener('click',   sendASNFromEditor);
+  $('btn-asn-edit-cancel')?.addEventListener('click', () => {
+    $('asn-edit-modal').classList.add('hidden');
+  });
+
   document.querySelectorAll('.example-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       chatInput.value = btn.dataset.prompt;
       chatInput.focus();
     });
   });
+
+  setupFileUpload();
 
   pollOpenCases();
   setInterval(pollOpenCases, 60_000);
@@ -225,6 +245,26 @@ async function sendMessage() {
 
   removeWelcome();
   addChatMessage('user', text);
+
+  // If ASN intent but no file uploaded yet — prompt the user to attach one
+  if (!parsedASNData && ASN_INTENT_RE.test(text)) {
+    addChatMessage('assistant',
+      'To create an ASN, please attach a packing slip first.\n\nClick the **📎** button in the chat footer to upload a PDF or DOCX packing slip, then I\'ll parse it and walk you through the rest.');
+    btnSend.disabled = false;
+    return;
+  }
+
+  // If a packing slip was uploaded and user is asking to create ASN — show review
+  if (parsedASNData && ASN_INTENT_RE.test(text)) {
+    const { parsed, poData, asnPayload, fusionBaseUrl, fusionUiBaseUrl } = parsedASNData;
+    renderDocSection(parsed);
+    renderPOSection(poData, parsed, fusionBaseUrl, fusionUiBaseUrl);
+    renderASNReview(parsed, poData, asnPayload);
+    sectionDoc.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    btnSend.disabled = false;
+    return;
+  }
+
   clearWorkspace();
 
   // Connect SSE before posting so we don't miss early events
@@ -693,6 +733,11 @@ function clearWorkspace() {
   logCountBadge.textContent = '';
   resultsContent.innerHTML = `<div class="empty-state">Results will appear here after execution.</div>`;
   sectionActions.classList.add('hidden');
+  sectionDoc?.classList.add('hidden');
+  sectionPO?.classList.add('hidden');
+  sectionASN?.classList.add('hidden');
+  pendingASNPayload = null;
+  parsedASNData     = null;
 }
 
 function newSession() {
@@ -709,6 +754,7 @@ function newSession() {
         <button class="example-btn" data-prompt="Get available case types">List case types</button>
         <button class="example-btn" data-prompt="Show me all active inventory locks">Active locks</button>
         <button class="example-btn" data-prompt="Create a quality case for damaged item LPN-001 at facility MAIN">Create case</button>
+        <button class="example-btn example-btn-asn" data-prompt="Create ASN">Create ASN</button>
       </div>
     </div>`;
   document.querySelectorAll('.example-btn').forEach(btn => {
@@ -762,3 +808,450 @@ function esc(str) {
 }
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+/* ─── File upload / ASN flow ─────────────────────────────────────────────── */
+
+function setupFileUpload() {
+  const input = $('file-upload');
+  if (!input) return;
+  input.addEventListener('change', e => {
+    const file = e.target.files?.[0];
+    if (file) handleFileSelect(file);
+    input.value = '';
+  });
+}
+
+async function handleFileSelect(file) {
+  removeWelcome();
+
+  addFilePreviewMessage(file);
+  addChatMessage('system', '🔍 Parsing packing slip…');
+
+  const formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    const res  = await fetch('/api/upload-document', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (!res.ok) {
+      addChatMessage('system', `Upload failed: ${data.error || res.statusText}`);
+      return;
+    }
+
+    const { parsed, poData, asnPayload, fusionBaseUrl, fusionUiBaseUrl, fusionOrgId } = data;
+
+    parsedASNData     = { parsed, poData, asnPayload, fusionBaseUrl, fusionUiBaseUrl, fusionOrgId };
+    pendingASNPayload = asnPayload;
+
+    const po    = esc(parsed.customerPONumber || parsed.poNumber || '');
+    const lines = parsed.lineItems?.length || 0;
+    addChatMessage('assistant',
+      `Packing slip parsed successfully!\n\n**PO:** ${po}  **BOL:** ${esc(parsed.bolNumber || '')}  **Lines:** ${lines} LPNs\n\nType **"create ASN"** to review the payload and submit to Oracle Fusion.`);
+
+  } catch (err) {
+    addChatMessage('system', `Upload error: ${err.message}`);
+  }
+}
+
+function addFilePreviewMessage(file) {
+  const el = document.createElement('div');
+  el.className = 'chat-msg file-preview user';
+
+  const isPDF   = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf');
+  const blobUrl = URL.createObjectURL(file);
+  const sizeMB  = (file.size / 1_048_576).toFixed(1);
+
+  const meta = `${isPDF ? 'PDF' : 'DOCX'} · ${sizeMB} MB`;
+  const icon = isPDF ? '📄' : '📝';
+
+  el.innerHTML = `
+    <div class="chat-avatar">ME</div>
+    <div class="chat-bubble file-bubble">
+      <div class="file-bubble-header">
+        <span class="file-bubble-icon">${icon}</span>
+        <div>
+          <div class="file-bubble-name">${esc(file.name)}</div>
+          <div class="file-bubble-meta">${meta}</div>
+        </div>
+      </div>
+      ${isPDF ? `<iframe class="file-preview-pdf" src="${blobUrl}" title="${esc(file.name)}"></iframe>` : ''}
+    </div>`;
+
+  chatMessages.appendChild(el);
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function renderDocSection(parsed) {
+  docContent.innerHTML = '';
+
+  const fields = [
+    { label: 'PO Number',    value: parsed.poNumber },
+    { label: 'Customer PO', value: parsed.customerPONumber },
+    { label: 'BOL Number',  value: parsed.bolNumber },
+    { label: 'Ship Date',   value: parsed.shipDate },
+    { label: 'Item Code',   value: parsed.itemCode },
+  ];
+
+  const grid = document.createElement('div');
+  grid.className = 'doc-fields-grid';
+  fields.forEach(({ label, value }) => {
+    if (!value) return;
+    const div = document.createElement('div');
+    div.className = 'doc-field';
+    div.innerHTML = `<div class="doc-field-label">${esc(label)}</div>
+                     <div class="doc-field-value">${esc(String(value))}</div>`;
+    grid.appendChild(div);
+  });
+  docContent.appendChild(grid);
+
+  if (parsed.lineItems?.length) {
+    const title = document.createElement('div');
+    title.className = 'result-section-title';
+    title.textContent = `Line Items (${parsed.lineItems.length})`;
+    docContent.appendChild(title);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'data-table-wrapper';
+    wrapper.innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>LPN</th><th>Lot</th><th>Qty</th><th>UOM</th><th>Expiry</th></tr></thead>
+        <tbody>${parsed.lineItems.map(item => `<tr>
+          <td class="cell-cyan">${esc(item.lpn  || '')}</td>
+          <td>${esc(item.lot  || '—')}</td>
+          <td>${esc(String(item.qty ?? ''))}</td>
+          <td>${esc(item.uom  || '')}</td>
+          <td>${esc(item.expiryDate || '—')}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    docContent.appendChild(wrapper);
+  }
+
+  sectionDoc.classList.remove('hidden');
+}
+
+function renderPOSection(poData, parsed, fusionBaseUrl, fusionUiBaseUrl) {
+  const poNumber = parsed?.customerPONumber || parsed?.poNumber || '';
+
+  if (!poData) {
+    poContent.innerHTML = `<div class="po-not-found">
+      <span>⚠</span> PO not found in Oracle Fusion — proceeding with empty vendor fields.
+    </div>`;
+    sectionPO.classList.remove('hidden');
+    return;
+  }
+
+  const fields = [
+    { label: 'Vendor Name',      value: poData.vendorName },
+    { label: 'Vendor Site Code', value: poData.vendorSiteCode },
+    { label: 'PO Lines',         value: `${(poData.lines || []).length} lines` },
+  ];
+
+  const grid = document.createElement('div');
+  grid.className = 'doc-fields-grid';
+  fields.forEach(({ label, value }) => {
+    const div = document.createElement('div');
+    div.className = 'doc-field';
+    div.innerHTML = `<div class="doc-field-label">${esc(label)}</div>
+                     <div class="doc-field-value">${esc(String(value || '—'))}</div>`;
+    grid.appendChild(div);
+  });
+  poContent.appendChild(grid);
+
+  if (poData.lines?.length) {
+    const title = document.createElement('div');
+    title.className = 'result-section-title';
+    title.textContent = `PO Lines (${poData.lines.length})`;
+    poContent.appendChild(title);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'data-table-wrapper';
+    wrapper.innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>Line #</th><th>Item Number</th><th>Quantity</th><th>UOM</th></tr></thead>
+        <tbody>${poData.lines.slice(0, 20).map(l => `<tr>
+          <td>${esc(String(l.LineNumber || ''))}</td>
+          <td class="cell-cyan">${esc(l.ItemNumber || '')}</td>
+          <td>${esc(String(l.Quantity || ''))}</td>
+          <td>${esc(l.UnitOfMeasure || '')}</td>
+        </tr>`).join('')}</tbody>
+      </table>`;
+    poContent.appendChild(wrapper);
+  }
+
+  const poHeaderId = poData?.poHeaderId;
+  if (poHeaderId && fusionUiBaseUrl) {
+    const url = `${fusionUiBaseUrl}/fndSetup/faces/deeplink` +
+                `?objType=PURCHASE_ORDER&objKey=poHeaderId=${poHeaderId}&action=VIEW`;
+    const link = document.createElement('a');
+    link.href        = url;
+    link.target      = '_blank';
+    link.rel         = 'noopener noreferrer';
+    link.className   = 'po-deep-link';
+    link.textContent = `View PO ${poNumber} in Oracle Fusion →`;
+    poContent.appendChild(link);
+  }
+
+  sectionPO.classList.remove('hidden');
+}
+
+function renderASNReview(parsed, poData, asnPayload) {
+  const poNum = asnPayload.lines?.[0]?.DocumentNumber || parsed.customerPONumber || parsed.poNumber || '';
+
+  const headerFields = [
+    { label: 'PO Number',     value: poNum },
+    { label: 'Shipment #',    value: asnPayload.ShipmentNumber },
+    { label: 'BOL',           value: asnPayload.BOL },
+    { label: 'Ship Date',     value: (asnPayload.ShippedDate || '').split('T')[0] },
+    { label: 'Vendor',        value: asnPayload.VendorName },
+    { label: 'Vendor Site',   value: asnPayload.VendorSiteCode },
+    { label: 'Org Code',      value: asnPayload.OrganizationCode },
+    { label: 'Business Unit', value: asnPayload.BusinessUnit },
+    { label: 'ASN Type',      value: asnPayload.ASNType },
+  ];
+
+  asnReviewContent.innerHTML = '';
+
+  const grid = document.createElement('div');
+  grid.className = 'doc-fields-grid';
+  headerFields.forEach(({ label, value }) => {
+    if (!value) return;
+    const div = document.createElement('div');
+    div.className = 'doc-field';
+    div.innerHTML = `<div class="doc-field-label">${esc(label)}</div>
+                     <div class="doc-field-value">${esc(String(value))}</div>`;
+    grid.appendChild(div);
+  });
+  asnReviewContent.appendChild(grid);
+
+  if (asnPayload.lines?.length) {
+    const title = document.createElement('div');
+    title.className = 'result-section-title';
+    title.textContent = `Line Items (${asnPayload.lines.length})`;
+    asnReviewContent.appendChild(title);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'data-table-wrapper';
+    wrapper.innerHTML = `
+      <table class="data-table">
+        <thead><tr><th>LPN</th><th>Item</th><th>Qty</th><th>UOM</th><th>Lot</th><th>Expiry</th></tr></thead>
+        <tbody>${asnPayload.lines.map(li => {
+          const lot = li.lotItemLots?.[0];
+          return `<tr>
+            <td class="cell-cyan">${esc(li.LicensePlateNumber || '')}</td>
+            <td>${esc(li.ItemNumber || '')}</td>
+            <td>${esc(String(li.Quantity || ''))}</td>
+            <td>${esc(li.UnitOfMeasure || '')}</td>
+            <td>${esc(lot?.LotNumber || '—')}</td>
+            <td>${esc(lot?.LotExpirationDate || '—')}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table>`;
+    asnReviewContent.appendChild(wrapper);
+  }
+
+  const bar = document.createElement('div');
+  bar.className = 'asn-confirm-bar';
+  bar.innerHTML = `
+    <button id="btn-asn-confirm" class="btn btn-danger">Review &amp; Edit JSON →</button>
+    <button id="btn-asn-cancel"  class="btn btn-ghost">Cancel</button>`;
+  asnReviewContent.appendChild(bar);
+
+  $('btn-asn-confirm').addEventListener('click', () => openASNEditor(pendingASNPayload));
+  $('btn-asn-cancel').addEventListener('click',  cancelASN);
+
+  sectionASN.classList.remove('hidden');
+}
+
+/* ── ASN header fields shown in the form ── */
+const ASN_HEADER_FIELDS = [
+  { key: 'VendorName',        label: 'Vendor Name',        numeric: false },
+  { key: 'VendorSiteCode',    label: 'Vendor Site Code',   numeric: false },
+  { key: 'ShipmentNumber',    label: 'Shipment Number',    numeric: true  },
+  { key: 'ShippedDate',       label: 'Shipped Date',       numeric: false },
+  { key: 'OrganizationCode',  label: 'Org Code',           numeric: false },
+  { key: 'BusinessUnit',      label: 'Business Unit',      numeric: false },
+  { key: 'ReceiptSourceCode', label: 'Receipt Source',     numeric: false },
+  { key: 'ASNType',           label: 'ASN Type',           numeric: false },
+  { key: 'EmployeeId',        label: 'Employee ID',        numeric: true  },
+];
+
+function openASNEditor(payload) {
+  const container = $('asn-form-container');
+  const errEl     = $('asn-json-error');
+  container.innerHTML = '';
+  errEl.classList.add('hidden');
+
+  // ── Header section ──
+  const hTitle = document.createElement('div');
+  hTitle.className = 'asn-form-section-title';
+  hTitle.textContent = 'Shipment Header';
+  container.appendChild(hTitle);
+
+  const grid = document.createElement('div');
+  grid.className = 'asn-form-grid';
+  ASN_HEADER_FIELDS.forEach(({ key, label }) => {
+    const row = document.createElement('div');
+    row.className = 'asn-form-row';
+    row.innerHTML = `
+      <label class="asn-form-label">${esc(label)}</label>
+      <input class="asn-form-input" data-field="${key}"
+             value="${esc(String(payload[key] ?? ''))}" />`;
+    grid.appendChild(row);
+  });
+  container.appendChild(grid);
+
+  // ── Line items section ──
+  if (payload.lines?.length) {
+    const lTitle = document.createElement('div');
+    lTitle.className = 'asn-form-section-title';
+    lTitle.textContent = `Line Items (${payload.lines.length})`;
+    container.appendChild(lTitle);
+
+    const wrapper = document.createElement('div');
+    wrapper.className = 'data-table-wrapper';
+
+    const thead = `<thead><tr>
+      <th>#</th><th>LPN</th><th>Document #</th><th>Item Number</th>
+      <th>Qty</th><th>UOM</th><th>Lot Number</th><th>Lot Expiry</th>
+    </tr></thead>`;
+
+    const rows = payload.lines.map((line, idx) => {
+      const lot = line.lotItemLots?.[0];
+      return `<tr>
+        <td class="asn-line-num">${idx + 1}</td>
+        <td><input class="asn-line-input cell-cyan"
+                   data-li="${idx}" data-lk="LicensePlateNumber"
+                   value="${esc(String(line.LicensePlateNumber || ''))}" /></td>
+        <td><input class="asn-line-input" data-li="${idx}" data-lk="DocumentNumber"  value="${esc(String(line.DocumentNumber  || ''))}" /></td>
+        <td><input class="asn-line-input" data-li="${idx}" data-lk="ItemNumber"      value="${esc(String(line.ItemNumber      || ''))}" /></td>
+        <td><input class="asn-line-input asn-line-narrow" type="number" min="0"
+                   data-li="${idx}" data-lk="Quantity"
+                   value="${esc(String(line.Quantity ?? ''))}" /></td>
+        <td><input class="asn-line-input asn-line-narrow"
+                   data-li="${idx}" data-lk="UnitOfMeasure"
+                   value="${esc(String(line.UnitOfMeasure || ''))}" /></td>
+        <td><input class="asn-line-input"
+                   data-li="${idx}" data-lk="_lotNumber"
+                   value="${esc(lot?.LotNumber || '')}" /></td>
+        <td><input class="asn-line-input"
+                   data-li="${idx}" data-lk="_lotExpiry"
+                   value="${esc(lot?.LotExpirationDate || '')}" /></td>
+      </tr>`;
+    }).join('');
+
+    wrapper.innerHTML = `<table class="data-table asn-lines-table">${thead}<tbody>${rows}</tbody></table>`;
+    container.appendChild(wrapper);
+  }
+
+  $('asn-edit-modal').classList.remove('hidden');
+}
+
+async function sendASNFromEditor() {
+  const errEl   = $('asn-json-error');
+  const sendBtn = $('btn-asn-edit-send');
+  errEl.classList.add('hidden');
+
+  // ── Read header fields ──
+  const payload = JSON.parse(JSON.stringify(pendingASNPayload)); // deep clone
+
+  $('asn-form-container').querySelectorAll('[data-field]').forEach(inp => {
+    const key = inp.dataset.field;
+    const val = inp.value.trim();
+    const def = ASN_HEADER_FIELDS.find(f => f.key === key);
+    payload[key] = (def?.numeric && val !== '') ? Number(val) : (val || payload[key]);
+  });
+
+  // ── Read line item edits ──
+  const lineEdits = {};
+  $('asn-form-container').querySelectorAll('[data-li]').forEach(inp => {
+    const idx = Number(inp.dataset.li);
+    const key = inp.dataset.lk;
+    if (!lineEdits[idx]) lineEdits[idx] = {};
+    lineEdits[idx][key] = inp.value.trim();
+  });
+
+  payload.lines = (pendingASNPayload?.lines || []).map((orig, idx) => {
+    const e   = lineEdits[idx] || {};
+    const qty = e.Quantity !== undefined ? Number(e.Quantity) || orig.Quantity : orig.Quantity;
+    const line = {
+      ...orig,
+      LicensePlateNumber: e.LicensePlateNumber ?? orig.LicensePlateNumber,
+      DocumentNumber:     e.DocumentNumber     ?? orig.DocumentNumber,
+      ItemNumber:         e.ItemNumber         ?? orig.ItemNumber,
+      Quantity:           qty,
+      UnitOfMeasure:      e.UnitOfMeasure      ?? orig.UnitOfMeasure,
+    };
+    if (line.lotItemLots?.[0]) {
+      line.lotItemLots = [{ ...line.lotItemLots[0],
+        LotNumber:           e._lotNumber ?? line.lotItemLots[0].LotNumber,
+        LotExpirationDate:   e._lotExpiry  ?? line.lotItemLots[0].LotExpirationDate,
+        TransactionQuantity: qty,
+      }];
+    }
+    return line;
+  });
+
+  sendBtn.disabled    = true;
+  sendBtn.textContent = 'Sending…';
+  $('asn-edit-modal').classList.add('hidden');
+
+  addChatMessage('system', '📤 Creating ASN in Oracle Fusion…');
+
+  try {
+    const res  = await fetch('/api/create-asn', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(payload),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      let msg = `ASN creation failed: ${data.error || res.statusText}`;
+      if (data.processingErrors?.length) {
+        const lines = data.processingErrors.map(e => {
+          const text = e.ErrorMessage || e.Message || e.errorMessage || JSON.stringify(e);
+          return `- ${text}`;
+        }).join('\n');
+        msg += `\n\n**Processing errors:**\n${lines}`;
+      } else if (data.detail) {
+        msg += `\n\n\`\`\`json\n${JSON.stringify(data.detail, null, 2)}\n\`\`\``;
+      }
+      addChatMessage('assistant', msg);
+      sendBtn.disabled    = false;
+      sendBtn.textContent = 'Send to Oracle Fusion';
+      $('asn-edit-modal').classList.remove('hidden');
+      return;
+    }
+
+    const shipNum = data.ShipmentNumber || payload.ShipmentNumber;
+    const poNum   = payload.lines?.[0]?.DocumentNumber || '';
+
+    let searchLink = '';
+    const { fusionBaseUrl, fusionOrgId } = parsedASNData || {};
+    if (fusionBaseUrl && fusionOrgId) {
+      const url = `${fusionBaseUrl}/fscmUI/redwood/receiving-shipments?organizationId=${encodeURIComponent(fusionOrgId)}`;
+      searchLink = `\n\n[Search for shipment **${shipNum}** in Oracle Fusion →](${url})`;
+    }
+
+    addChatMessage('assistant',
+      `✓ ASN created in Oracle Fusion!\n\n**Shipment:** ${shipNum}\n**PO:** ${poNum}${searchLink}`);
+
+    sectionASN.classList.add('hidden');
+    pendingASNPayload = null;
+    parsedASNData     = null;
+
+  } catch (err) {
+    addChatMessage('system', `ASN request failed: ${err.message}`);
+    sendBtn.disabled    = false;
+    sendBtn.textContent = 'Send to Oracle Fusion';
+  }
+}
+
+function cancelASN() {
+  sectionASN.classList.add('hidden');
+  sectionPO.classList.add('hidden');
+  sectionDoc.classList.add('hidden');
+  pendingASNPayload = null;
+  addChatMessage('system', '✕ ASN creation cancelled.');
+}

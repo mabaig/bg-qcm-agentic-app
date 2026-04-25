@@ -55,6 +55,7 @@
               <button class="example-btn" data-prompt="Get available case types">List case types</button>
               <button class="example-btn" data-prompt="Show me all active inventory locks">Active locks</button>
               <button class="example-btn" data-prompt="Create a quality case for damaged item LPN-001 at facility MAIN">Create case</button>
+              <button class="example-btn example-btn-asn" data-prompt="Create ASN">Create ASN</button>
             </div>
           </div>
         </div>
@@ -68,7 +69,11 @@
           ></textarea>
           <div class="chat-input-footer">
             <span class="input-hint">Shift+Enter for new line · Enter to send</span>
-            <button id="btn-send" class="btn btn-primary">Send →</button>
+            <div class="input-footer-right">
+              <label for="file-upload" class="btn btn-ghost btn-upload" title="Upload packing slip (PDF or DOCX)">📎</label>
+              <input type="file" id="file-upload" accept=".pdf,.docx" class="hidden" />
+              <button id="btn-send" class="btn btn-primary">Send →</button>
+            </div>
           </div>
         </div>
       </section>
@@ -130,6 +135,39 @@
           </div>
         </div>
 
+        <!-- ⑤ Parsed Document -->
+        <div class="workspace-section hidden" id="section-doc">
+          <div class="section-header">
+            <span class="section-icon">📄</span>
+            <span class="section-title">Parsed Document</span>
+          </div>
+          <div id="doc-content" class="doc-content">
+            <div class="empty-state">Upload a packing slip to see parsed fields.</div>
+          </div>
+        </div>
+
+        <!-- ⑥ PO Details — Oracle Fusion -->
+        <div class="workspace-section hidden" id="section-po">
+          <div class="section-header">
+            <span class="section-icon">🏢</span>
+            <span class="section-title">Purchase Order — Oracle Fusion</span>
+          </div>
+          <div id="po-content" class="po-content">
+            <div class="empty-state">PO details will appear after upload.</div>
+          </div>
+        </div>
+
+        <!-- ⑦ ASN Payload — Review & Confirm -->
+        <div class="workspace-section hidden" id="section-asn-review">
+          <div class="section-header">
+            <span class="section-icon">🚚</span>
+            <span class="section-title">ASN Payload — Review &amp; Confirm</span>
+          </div>
+          <div id="asn-review-content" class="asn-review-content">
+            <div class="empty-state">ASN payload will appear after upload.</div>
+          </div>
+        </div>
+
       </section>
     </main>
   </div>
@@ -149,6 +187,28 @@
       <div class="modal-footer">
         <button id="btn-modal-confirm" class="btn btn-danger">Confirm &amp; Execute</button>
         <button id="btn-modal-cancel" class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── ASN JSON Editor Modal ──────────────────────────────────────────────── -->
+  <div id="asn-edit-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-box asn-edit-modal-box">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <span class="modal-icon">✏️</span>
+          <span class="modal-title">Edit ASN Payload</span>
+        </div>
+        <span class="modal-tool-badge">Oracle Fusion · receivingReceiptRequests</span>
+      </div>
+      <p class="modal-desc">Review and edit the fields below before sending to Oracle Fusion.</p>
+      <div class="modal-body asn-editor-body">
+        <div id="asn-form-container"></div>
+        <div id="asn-json-error" class="asn-json-error hidden"></div>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-asn-edit-send"   class="btn btn-danger">Send to Oracle Fusion</button>
+        <button id="btn-asn-edit-cancel" class="btn btn-ghost">Cancel</button>
       </div>
     </div>
   </div>

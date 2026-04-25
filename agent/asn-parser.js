@@ -100,7 +100,7 @@ function buildASNPayload(parsed, poLines, config) {
       DocumentLineNumber: lineMap[parsed.itemCode] || 1,
       DocumentNumber:     documentNumber,
       ItemNumber:         parsed.itemCode,
-      LicensePlateNumber: item.lpn,
+      //LicensePlateNumber: item.lpn,
       OrganizationCode:   orgCode,
       Quantity:           qty,
       ReceiptSourceCode:  'VENDOR',

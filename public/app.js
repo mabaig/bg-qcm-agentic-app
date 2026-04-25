@@ -22,6 +22,26 @@ let logCount    = 0;
 let stats       = { total: 0, success: 0, failed: 0 };
 let tableData   = {};   // toolName → result array, for result tables
 
+/* ─── Review-modal field configs ────────────────────────────────────────────── */
+const REVIEW_FIELDS = {
+  create_quality_case: [
+    { key: 'description',    label: 'Description',      editable: true,  type: 'textarea' },
+    { key: 'caseTypeId',     label: 'Case Type ID',     editable: false },
+    { key: 'priorityLevel',  label: 'Priority',         editable: true,  type: 'select', options: ['Low','Medium','High'] },
+    { key: 'affectedLotLpn', label: 'Affected LPN/Lot', editable: true,  type: 'text' },
+    { key: 'facilityCode',   label: 'Facility',         editable: false },
+  ],
+  lock_inventory: [
+    { key: 'targetType',   label: 'Target Type',    editable: false },
+    { key: 'targetValue',  label: 'Target Value(s)',editable: false },
+    { key: 'caseId',       label: 'Case ID',        editable: false },
+    { key: 'reasonCodeId', label: 'Reason Code ID', editable: false },
+    { key: 'skuValue',     label: 'SKU',            editable: false },
+    { key: 'lockComments', label: 'Lock Comments',  editable: true, type: 'textarea' },
+    { key: 'priority',     label: 'Priority',       editable: true, type: 'select', options: ['Low','Medium','High'] },
+  ],
+};
+
 /* ─── DOM refs ─────────────────────────────────────────────────────────────── */
 const $ = id => document.getElementById(id);
 
@@ -29,6 +49,13 @@ const chatMessages    = $('chat-messages');
 const chatInput       = $('chat-input');
 const btnSend         = $('btn-send');
 const btnNewSession   = $('btn-new-session');
+const btnBell         = $('btn-bell');
+const bellBadge       = $('bell-badge');
+const reviewModal     = $('review-modal');
+const modalToolBadge  = $('modal-tool-badge');
+const modalBody       = $('modal-body');
+const btnModalConfirm = $('btn-modal-confirm');
+const btnModalCancel  = $('btn-modal-cancel');
 const agentBadge      = $('agent-status-badge');
 const planContent     = $('plan-content');
 const planImpact      = $('plan-impact');
@@ -50,6 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
   btnNewSession.addEventListener('click', newSession);
   btnConfirm.addEventListener('click', () => sendConfirmation(true));
   btnCancel.addEventListener('click',  () => sendConfirmation(false));
+  btnBell.addEventListener('click', onBellClick);
+  btnModalConfirm.addEventListener('click', () => submitReview(true));
+  btnModalCancel.addEventListener('click',  () => submitReview(false));
 
   document.querySelectorAll('.example-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -57,7 +87,36 @@ document.addEventListener('DOMContentLoaded', () => {
       chatInput.focus();
     });
   });
+
+  pollOpenCases();
+  setInterval(pollOpenCases, 60_000);
 });
+
+/* ─── Bell / open-cases polling ─────────────────────────────────────────────── */
+async function pollOpenCases() {
+  try {
+    const res = await fetch('/api/open-cases-count');
+    if (!res.ok) return;
+    const { count } = await res.json();
+    updateBell(count);
+  } catch { /* silent — network may be unavailable */ }
+}
+
+function updateBell(count) {
+  if (count > 0) {
+    bellBadge.textContent = count > 99 ? '99+' : String(count);
+    bellBadge.classList.remove('hidden');
+    btnBell.classList.add('has-alerts');
+  } else {
+    bellBadge.classList.add('hidden');
+    btnBell.classList.remove('has-alerts');
+  }
+}
+
+function onBellClick() {
+  chatInput.value = 'Show me all open quality cases';
+  chatInput.focus();
+}
 
 /* ─── Keyboard ──────────────────────────────────────────────────────────────── */
 function onInputKeydown(e) {
@@ -110,6 +169,7 @@ function connectSSE(sid) {
   eventSource.addEventListener('plan',                  e => onPlan(JSON.parse(e.data)));
   eventSource.addEventListener('plan_step_update',      e => onPlanStepUpdate(JSON.parse(e.data)));
   eventSource.addEventListener('confirmation_required', e => onConfirmationRequired(JSON.parse(e.data)));
+  eventSource.addEventListener('review_required',       e => onReviewRequired(JSON.parse(e.data)));
   eventSource.addEventListener('step_start',            e => onStepStart(JSON.parse(e.data)));
   eventSource.addEventListener('step_complete',         e => onStepComplete(JSON.parse(e.data)));
   eventSource.addEventListener('step_error',            e => onStepError(JSON.parse(e.data)));
@@ -209,6 +269,89 @@ function onAgentError(data) {
   btnSend.disabled = false;
   addChatMessage('system', `Error: ${data.message}`);
   eventSource?.close();
+}
+
+/* ─── Payload review modal ──────────────────────────────────────────────────── */
+function onReviewRequired(data) {
+  const labels = {
+    create_quality_case: 'Create Quality Case',
+    lock_inventory:      'Lock Inventory',
+  };
+  modalToolBadge.textContent = labels[data.toolName] || data.toolName;
+  buildModalForm(data.toolName, data.payload);
+  reviewModal.classList.remove('hidden');
+  addChatMessage('system', `⚠ Review payload for "${labels[data.toolName] || data.toolName}" before executing.`);
+}
+
+function buildModalForm(toolName, payload) {
+  const fields = REVIEW_FIELDS[toolName] || [];
+  modalBody.innerHTML = '';
+
+  for (const field of fields) {
+    const val = payload[field.key];
+    if (val === undefined && !field.editable) continue;
+
+    const row = document.createElement('div');
+    row.className = 'review-field';
+
+    const lbl = document.createElement('label');
+    lbl.className = `review-label${field.editable ? ' editable' : ''}`;
+    lbl.textContent = field.label;
+    row.appendChild(lbl);
+
+    if (field.editable) {
+      if (field.type === 'textarea') {
+        const ta = document.createElement('textarea');
+        ta.className = 'review-input'; ta.dataset.key = field.key;
+        ta.value = String(val ?? ''); ta.rows = 3;
+        row.appendChild(ta);
+      } else if (field.type === 'select') {
+        const sel = document.createElement('select');
+        sel.className = 'review-input'; sel.dataset.key = field.key;
+        (field.options || []).forEach(opt => {
+          const o = document.createElement('option');
+          o.value = opt; o.textContent = opt;
+          if (opt === (val || field.options[1])) o.selected = true;
+          sel.appendChild(o);
+        });
+        row.appendChild(sel);
+      } else {
+        const inp = document.createElement('input');
+        inp.className = 'review-input'; inp.dataset.key = field.key;
+        inp.type = 'text';
+        inp.value = Array.isArray(val) ? val.join(', ') : String(val ?? '');
+        row.appendChild(inp);
+      }
+    } else {
+      const div = document.createElement('div');
+      div.className = 'review-value';
+      div.textContent = Array.isArray(val) ? val.join(', ') : String(val ?? '—');
+      row.appendChild(div);
+    }
+
+    modalBody.appendChild(row);
+  }
+}
+
+async function submitReview(approved) {
+  reviewModal.classList.add('hidden');
+
+  const overrides = {};
+  if (approved) {
+    modalBody.querySelectorAll('.review-input').forEach(el => {
+      overrides[el.dataset.key] = el.value;
+    });
+  }
+
+  try {
+    await fetch('/api/review-approve', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionId, approved, overrides }),
+    });
+  } catch (err) {
+    addChatMessage('system', `Review submit failed: ${err.message}`);
+  }
 }
 
 /* ─── Confirmation ──────────────────────────────────────────────────────────── */

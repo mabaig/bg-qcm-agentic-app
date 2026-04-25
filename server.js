@@ -58,7 +58,7 @@ app.post('/api/chat', async (req, res) => {
   const sessionId = existingId || randomUUID();
 
   if (!sessions.has(sessionId)) {
-    sessions.set(sessionId, { messages: [], status: 'idle', pendingConfirmation: null });
+    sessions.set(sessionId, { messages: [], status: 'idle', pendingConfirmation: null, pendingReview: null });
   }
 
   const session = sessions.get(sessionId);
@@ -90,11 +90,50 @@ app.post('/api/confirm', (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Review and approve a pending tool-call payload ───────────────────────
+app.post('/api/review-approve', (req, res) => {
+  const { sessionId, approved, overrides } = req.body;
+  const session = sessions.get(sessionId);
+
+  if (!session || !session.pendingReview) {
+    return res.status(400).json({ error: 'No pending review for this session' });
+  }
+
+  session.pendingReview.resolve({ approved: !!approved, overrides: overrides || {} });
+  session.pendingReview = null;
+  res.json({ ok: true });
+});
+
 // ── Session state (for reconnects) ───────────────────────────────────────
 app.get('/api/session/:sessionId', (req, res) => {
   const session = sessions.get(req.params.sessionId);
   if (!session) return res.status(404).json({ error: 'Session not found' });
   res.json({ status: session.status, messageCount: session.messages.length });
+});
+
+// ── Open cases count (bell notification) ──────────────────────────────────
+app.get('/api/open-cases-count', async (_, res) => {
+  try {
+    const base = process.env.ORDS_BASE_URL ||
+      'https://g4b9bc24e36abdb-atpintellinum.adb.us-ashburn-1.oraclecloudapps.com/ords/qcm_demo/quality';
+
+    const headers = { 'Content-Type': 'application/json', status: 'OPEN' };
+    if (process.env.ORDS_USERNAME && process.env.ORDS_PASSWORD) {
+      const token = Buffer.from(`${process.env.ORDS_USERNAME}:${process.env.ORDS_PASSWORD}`).toString('base64');
+      headers.Authorization = `Basic ${token}`;
+    } else if (process.env.ORDS_BEARER_TOKEN) {
+      headers.Authorization = `Bearer ${process.env.ORDS_BEARER_TOKEN}`;
+    }
+
+    const resp = await fetch(`${base}/case`, { headers, signal: AbortSignal.timeout(8000) });
+    if (!resp.ok) return res.json({ count: 0 });
+
+    const data = await resp.json();
+    const count = data.items?.[0]?.total_results ?? data.items?.length ?? 0;
+    res.json({ count: Number(count) });
+  } catch {
+    res.json({ count: 0 });
+  }
 });
 
 // ── Health check ──────────────────────────────────────────────────────────

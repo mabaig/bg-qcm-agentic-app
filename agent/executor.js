@@ -28,9 +28,14 @@ async function ordsGet(path, extraHeaders = {}) {
   return res.json();
 }
 
-async function ordsPost(path, body = {}) {
+async function ordsPost(path, body = {}, { keepEmpty = false } = {}) {
   const url = `${BASE_URL}${path}`;
-  const clean = Object.fromEntries(Object.entries(body).filter(([, v]) => v !== undefined && v !== null && v !== ''));
+  const clean = Object.fromEntries(
+    Object.entries(body).filter(([, v]) => keepEmpty
+      ? v !== undefined && v !== null
+      : v !== undefined && v !== null && v !== '',
+    ),
+  );
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
@@ -106,20 +111,29 @@ const toolExecutors = {
   },
 
   async lock_inventory(input) {
+    // targetValue must be an array — normalise if the agent passes a plain string
+    const targets = Array.isArray(input.targetValue)
+      ? input.targetValue
+      : [input.targetValue].filter(Boolean);
+
     return ordsPost('/case-lock-mapping', {
-      caseId: input.caseId,
-      targetType: input.targetType,
-      targetValue: input.targetValue,
-      reasonCode: input.reasonCode,
-      lockComments: input.lockComments,
-      facilityCode: input.facilityCode,
-      expiryDate: input.expiryDate,
-      lotNumber: input.lotNumber,
-      itemNumber: input.itemNumber,
-      locationBarcode: input.locationBarcode,
-      orderNumber: input.orderNumber,
-      quantity: input.quantity,
-    });
+      case:         input.case        || '',
+      caseId:       input.caseId,
+      caseTypeId:   input.caseTypeId,
+      priority:     input.priority    || 'Medium',
+      description:  input.description || '',
+      affectedLpn:  input.affectedLpn || '',
+      assingnedTo:  input.assignedTo  || 'ANY',      // API field has typo — must match
+      reasonCodeId: input.reasonCodeId,
+      skuValue:     input.skuValue    || '',
+      targetType:   input.targetType,
+      lotNumber:    input.lotNumber   || '',
+      targetValue:  targets,
+      lockComments: input.lockComments || '',
+      status:       'Completed',
+      userName:     process.env.QCM_USERNAME,
+      loginId:      process.env.QCM_LOGIN_ID,
+    }, { keepEmpty: true });
   },
 
   async unlock_inventory(input) {

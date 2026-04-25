@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QCM Agent — Quality Case Management</title>
+  <title>QCM Agentic App — Quality Case Management</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -14,13 +14,20 @@
       <div class="header-left">
         <div class="logo">
           <span class="logo-icon">⬡</span>
-          <span class="logo-text">QCM<span class="logo-accent"> Agent</span></span>
+          <span class="logo-text">QCM <span class="logo-accent">Agentic App</span></span>
         </div>
         <span class="header-subtitle">Quality Case Management · Agentic Operations</span>
       </div>
       <div class="header-right">
+        <button id="btn-bell" class="bell-btn" title="Open quality cases">
+          <svg class="bell-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+          </svg>
+          <span id="bell-badge" class="bell-badge hidden">0</span>
+        </button>
         <span id="agent-status-badge" class="status-badge idle">Idle</span>
-        <button id="btn-new-session" class="btn btn-ghost" title="New conversation">↺ New</button>
+        <button id="btn-new-session" class="btn btn-outline" title="New conversation">↺ New</button>
       </div>
     </header>
 
@@ -118,6 +125,25 @@
 
       </section>
     </main>
+  </div>
+
+  <!-- ── Payload Review Modal ─────────────────────────────────────────── -->
+  <div id="review-modal" class="modal-overlay hidden" role="dialog" aria-modal="true">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <span class="modal-icon">🔍</span>
+          <span class="modal-title">Review Before Executing</span>
+        </div>
+        <span id="modal-tool-badge" class="modal-tool-badge"></span>
+      </div>
+      <p class="modal-desc">Review the payload below. Editable fields are highlighted — adjust before confirming.</p>
+      <div id="modal-body" class="modal-body"></div>
+      <div class="modal-footer">
+        <button id="btn-modal-confirm" class="btn btn-danger">Confirm &amp; Execute</button>
+        <button id="btn-modal-cancel" class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/marked@14/marked.min.js"></script>

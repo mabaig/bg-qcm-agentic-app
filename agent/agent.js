@@ -6,6 +6,9 @@ const { toolDefinitions } = require('./tools');
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
 
+// Tools that require the user to review and approve the exact payload before execution
+const REVIEW_TOOLS = new Set(['create_quality_case', 'lock_inventory']);
+
 // System prompt used in Phase 1 (planning — no tools called)
 const PLAN_SYSTEM = `You are an enterprise warehouse quality operations agent for a Quality Case Management (QCM) system.
 
@@ -183,8 +186,44 @@ async function runAgent(session, sessionId, sendEvent) {
         id: toolCall.id,
       });
 
+      // ── Pre-execution payload review for write operations ───────────────
+      let toolInput = toolCall.input;
+
+      if (REVIEW_TOOLS.has(toolCall.name)) {
+        const reviewPromise = new Promise(resolve => { session.pendingReview = { resolve }; });
+
+        sendEvent('review_required', {
+          toolName: toolCall.name,
+          payload:  toolCall.input,
+          stepIndex,
+          id: toolCall.id,
+        });
+
+        const { approved, overrides } = await reviewPromise;
+
+        if (!approved) {
+          stats.failed++;
+          if (planStepIdx >= 0) {
+            planSteps[planStepIdx].status = 'failed';
+            sendEvent('plan_step_update', { index: planStepIdx, status: 'failed' });
+          }
+          sendEvent('step_error', {
+            stepIndex, toolName: toolCall.name,
+            error: 'Cancelled by user at review stage.',
+            status: 'failed', id: toolCall.id,
+          });
+          toolResults.push({
+            type: 'tool_result', tool_use_id: toolCall.id,
+            content: 'User cancelled this step at review.', is_error: true,
+          });
+          continue;
+        }
+
+        toolInput = { ...toolCall.input, ...overrides };
+      }
+
       try {
-        const result = await executeTool(toolCall.name, toolCall.input);
+        const result = await executeTool(toolCall.name, toolInput);
         stats.success++;
 
         if (planStepIdx >= 0) {

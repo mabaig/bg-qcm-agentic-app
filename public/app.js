@@ -50,6 +50,7 @@ const chatInput       = $('chat-input');
 const btnSend         = $('btn-send');
 const btnNewSession   = $('btn-new-session');
 const btnBell         = $('btn-bell');
+const btnTheme        = $('btn-theme');
 const bellBadge       = $('bell-badge');
 const reviewModal     = $('review-modal');
 const modalToolBadge  = $('modal-tool-badge');
@@ -70,14 +71,23 @@ const logCountBadge   = $('log-count');
 const resultsContent  = $('results-content');
 const panelDot        = document.querySelector('.panel-dot');
 
+/* ─── SVG icon helpers ───────────────────────────────────────────────────── */
+const SVG_SUN  = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>`;
+const SVG_MOON = `<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>`;
+const SVG_CHEVRON = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
+
 /* ─── Init ─────────────────────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
+  initTheme();
+  setupCollapsibleSections();
+
   chatInput.addEventListener('keydown', onInputKeydown);
   btnSend.addEventListener('click', sendMessage);
   btnNewSession.addEventListener('click', newSession);
   btnConfirm.addEventListener('click', () => sendConfirmation(true));
   btnCancel.addEventListener('click',  () => sendConfirmation(false));
   btnBell.addEventListener('click', onBellClick);
+  btnTheme.addEventListener('click', toggleTheme);
   btnModalConfirm.addEventListener('click', () => submitReview(true));
   btnModalCancel.addEventListener('click',  () => submitReview(false));
 
@@ -91,6 +101,45 @@ document.addEventListener('DOMContentLoaded', () => {
   pollOpenCases();
   setInterval(pollOpenCases, 60_000);
 });
+
+/* ─── Theme toggle ───────────────────────────────────────────────────────── */
+function initTheme() {
+  const saved = localStorage.getItem('theme') || 'dark';
+  applyTheme(saved);
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  if (btnTheme) btnTheme.innerHTML = theme === 'light' ? SVG_MOON : SVG_SUN;
+  localStorage.setItem('theme', theme);
+}
+
+function toggleTheme() {
+  const current = localStorage.getItem('theme') || 'dark';
+  applyTheme(current === 'light' ? 'dark' : 'light');
+}
+
+/* ─── Collapsible workspace sections ────────────────────────────────────── */
+function setupCollapsibleSections() {
+  ['section-plan', 'section-logs', 'section-results'].forEach(id => {
+    const section = $(id);
+    if (!section) return;
+    const header = section.querySelector('.section-header');
+    if (!header) return;
+
+    const btn = document.createElement('button');
+    btn.className = 'section-collapse-btn';
+    btn.setAttribute('aria-label', 'Collapse section');
+    btn.innerHTML = SVG_CHEVRON;
+    header.appendChild(btn);
+
+    btn.addEventListener('click', () => {
+      section.classList.toggle('collapsed');
+      btn.setAttribute('aria-label',
+        section.classList.contains('collapsed') ? 'Expand section' : 'Collapse section');
+    });
+  });
+}
 
 /* ─── Bell / open-cases polling ─────────────────────────────────────────────── */
 async function pollOpenCases() {

@@ -94,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initTheme();
   setupCollapsibleSections();
   setupResizeHandle();
+  setupMobileTabs();
 
   chatInput.addEventListener('keydown', onInputKeydown);
   btnSend.addEventListener('click', sendMessage);
@@ -146,7 +147,8 @@ function toggleTheme() {
 
 /* ─── Collapsible workspace sections ────────────────────────────────────── */
 function setupCollapsibleSections() {
-  ['section-plan', 'section-logs', 'section-results'].forEach(id => {
+  ['section-plan', 'section-logs', 'section-results',
+   'section-doc', 'section-po', 'section-asn-review'].forEach(id => {
     const section = $(id);
     if (!section) return;
     const header = section.querySelector('.section-header');
@@ -163,6 +165,27 @@ function setupCollapsibleSections() {
       btn.setAttribute('aria-label',
         section.classList.contains('collapsed') ? 'Expand section' : 'Collapse section');
     });
+  });
+}
+
+/* ─── Mobile tab navigation ──────────────────────────────────────────────── */
+function setupMobileTabs() {
+  const tabBar  = document.getElementById('mobile-tab-bar');
+  const appBody = document.querySelector('.app-body');
+  if (!tabBar || !appBody) return;
+
+  tabBar.querySelectorAll('.mobile-tab').forEach(tab => {
+    tab.addEventListener('click', () => switchMobileTab(tab.dataset.tab));
+  });
+}
+
+function switchMobileTab(tab) {
+  const appBody = document.querySelector('.app-body');
+  const tabBar  = document.getElementById('mobile-tab-bar');
+  if (!appBody || !tabBar) return;
+  appBody.dataset.tab = tab;
+  tabBar.querySelectorAll('.mobile-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
   });
 }
 
@@ -260,12 +283,14 @@ async function sendMessage() {
     renderDocSection(parsed);
     renderPOSection(poData, parsed, fusionBaseUrl, fusionUiBaseUrl);
     renderASNReview(parsed, poData, asnPayload);
+    switchMobileTab('workspace');
     sectionDoc.scrollIntoView({ behavior: 'smooth', block: 'start' });
     btnSend.disabled = false;
     return;
   }
 
   clearWorkspace();
+  switchMobileTab('workspace');
 
   // Connect SSE before posting so we don't miss early events
   if (!sessionId) sessionId = crypto.randomUUID();
@@ -352,6 +377,7 @@ function onConfirmationRequired(data) {
   btnConfirm.disabled = false;
   btnCancel.disabled  = false;
   addChatMessage('assistant', `⚠ Confirmation required:\n${data.message}`);
+  switchMobileTab('workspace');
   sectionActions.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -387,6 +413,7 @@ function onComplete(data) {
   addChatMessage('assistant', data.summary || data.message || 'Done.');
   renderResults(data);
   eventSource?.close();
+  switchMobileTab('chat');
 }
 
 function onCancelled(data) {
@@ -395,6 +422,7 @@ function onCancelled(data) {
   sectionActions.classList.add('hidden');
   addChatMessage('system', `✕ ${data.message}`);
   eventSource?.close();
+  switchMobileTab('chat');
 }
 
 function onOffTopic(data) {
@@ -402,6 +430,7 @@ function onOffTopic(data) {
   btnSend.disabled = false;
   addChatMessage('assistant', data.message || 'I can only help with QCM and Oracle WMS Cloud operations.');
   eventSource?.close();
+  switchMobileTab('chat');
 }
 
 function onAgentError(data) {

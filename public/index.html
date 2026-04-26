@@ -35,8 +35,14 @@
       </div>
     </header>
 
+    <!-- ── Mobile tab bar (hidden on desktop) ──────────────────── -->
+    <div id="mobile-tab-bar" class="mobile-tab-bar">
+      <button class="mobile-tab active" data-tab="chat">💬 Chat</button>
+      <button class="mobile-tab" data-tab="workspace">🖥 Workspace</button>
+    </div>
+
     <!-- ── Main layout ───────────────────────────────────────── -->
-    <main class="app-body">
+    <main class="app-body" data-tab="chat">
 
       <!-- LEFT — Chat (30%) -->
       <section class="panel-chat">

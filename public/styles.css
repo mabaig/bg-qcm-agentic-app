@@ -956,6 +956,9 @@ select.review-input { cursor: pointer; appearance: auto; }
   .panel-workspace { padding: 10px; gap: 8px; }
 }
 
+/* ─── Mobile tab bar (hidden on desktop) ────────────────────────────────── */
+.mobile-tab-bar { display: none; }
+
 /* ─── Responsive — mobile (≤ 768px) ─────────────────────────────────────── */
 @media (max-width: 768px) {
   /* Header */
@@ -967,29 +970,68 @@ select.review-input { cursor: pointer; appearance: auto; }
   .status-badge { min-width: 70px; font-size: 10px; padding: 4px 10px; }
   .btn-outline, #btn-signout { padding: 5px 10px; font-size: 12px; }
 
-  /* Stack panels vertically */
-  .app-body { flex-direction: column; }
+  /* Tab bar */
+  .mobile-tab-bar {
+    display: flex;
+    height: 44px;
+    background: var(--bg-base);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .mobile-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-family: var(--font-ui);
+    cursor: pointer;
+    transition: color var(--ease), border-color var(--ease);
+    padding: 0;
+  }
+  .mobile-tab.active {
+    color: var(--orange);
+    border-bottom-color: var(--orange);
+  }
 
-  /* Chat: compact strip at top */
-  .panel-chat {
+  /* Stack panels, each fills full height under header+tabs */
+  .app-body {
+    flex-direction: column;
+    position: relative;
+  }
+
+  /* Panel sizing via data-tab */
+  .panel-chat,
+  .panel-workspace {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
     width: 100% !important;
     min-width: unset !important;
-    min-height: unset;
-    height: 220px;
-    flex-shrink: 0;
+    height: 100%;
+    transition: opacity 150ms ease, visibility 150ms ease;
+  }
+
+  .app-body[data-tab="chat"]      .panel-workspace { opacity: 0; visibility: hidden; pointer-events: none; }
+  .app-body[data-tab="workspace"] .panel-chat      { opacity: 0; visibility: hidden; pointer-events: none; }
+
+  /* Chat panel adjustments */
+  .panel-chat {
     border-right: none;
-    border-bottom: 1px solid var(--border);
+    border-bottom: none;
+    display: flex;
+    flex-direction: column;
   }
   .chat-messages { gap: 7px; padding: 10px; }
   .chat-input-area { padding: 8px 10px; }
-  .chat-input { font-size: 16px; rows: 2; } /* 16px prevents iOS zoom */
+  .chat-input { font-size: 16px; } /* 16px prevents iOS zoom */
   .input-hint { display: none; }
 
   /* Hide resize handle */
   .resize-handle { display: none; }
 
-  /* Workspace: fills remaining height */
-  .panel-workspace { width: 100%; padding: 8px; gap: 7px; }
+  /* Workspace */
+  .panel-workspace { padding: 8px; gap: 7px; }
 
   /* Compact workspace sections */
   .section-header { padding: 8px 12px; }
@@ -1020,7 +1062,6 @@ select.review-input { cursor: pointer; appearance: auto; }
   .header-right { gap: 4px; }
   .theme-btn, .bell-btn { width: 26px; height: 26px; }
   #btn-signout { display: none; }  /* too cramped — sign-out via session expiry */
-  .panel-chat { height: 200px; }
   .chat-bubble { font-size: 12px; padding: 6px 10px; }
   .plan-step { padding: 7px 9px; gap: 8px; }
   .step-desc { font-size: 11px; }

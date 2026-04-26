@@ -1176,7 +1176,7 @@ async function sendASNFromEditor() {
     const qty = e.Quantity !== undefined ? Number(e.Quantity) || orig.Quantity : orig.Quantity;
     const line = {
       ...orig,
-      LicensePlateNumber: e.LicensePlateNumber ?? orig.LicensePlateNumber,
+      //LicensePlateNumber: e.LicensePlateNumber ?? orig.LicensePlateNumber,
       DocumentNumber:     e.DocumentNumber     ?? orig.DocumentNumber,
       ItemNumber:         e.ItemNumber         ?? orig.ItemNumber,
       Quantity:           qty,
